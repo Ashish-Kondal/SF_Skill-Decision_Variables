@@ -1,0 +1,410 @@
+---
+title: "Plotting for Manuscript: Seasonal Forecast Skill In Decision Variables"
+author: "Ashish Kondal"
+date: "04/09/2024"
+output: html_document
+---
+
+
+#-------------------------------------------------------------------------------
+## 				SETUP - STARTING WITH FRESH ENVIRONMENT AND CONSOLE
+#-------------------------------------------------------------------------------
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(fig.width = 12, fig.height = 8, fig.path ='Figs/',echo = FALSE, warning = FALSE, message = FALSE)
+cat("\014")     				# Clear console
+rm(list = ls()) 				# Clearing the Environment and saved variable
+```
+
+## Installing Packages
+
+#install.packages("dplyr")
+#install.packages("data.table")
+#install.packages("tidyverse")
+#install.packages("pracma")
+#install.packages("GGally")
+#install.packages("reshape2")
+#install.packages("Metrics")
+#install.packages("ggpubr")
+#install.packages("swfscMisc")
+#install.packages("here")
+
+
+
+#-------------------------------------------------------------------------------
+## 				LOADING PACKAGES
+#-------------------------------------------------------------------------------
+```{r Loading Packages, include = FALSE, echo = FALSE, warning=FALSE}
+library(readr)		
+library(knitr)
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(sf)
+library(here)
+library(stringr)
+```
+
+
+#-------------------------------------------------------------------------------
+## 				INPUT SETUP - DEFINE VARIABLES AND DIRECTORIES
+#-------------------------------------------------------------------------------
+
+```{r Input setup, echo=FALSE}
+input_dir <- paste("sample_data/", sep="")  		 # Setting working directory and suffix as file address
+output_dir <- paste("sample_data/output/", sep="") 		 # Setting output directory to store files and final images
+
+if (!dir.exists(paste(output_dir, sep=""))){			# check if output directory already exists or not.
+	dir.create(paste(output_dir, sep="")) }  			# Create output directory if not already exists
+
+huc6_shapefile_address <- paste("Shapefiles/PNW_Shapefile_USonly/pnw_shapefile_USonly.shp", sep="")
+wa_shapefile_address <- paste("Shapefiles/WA_Shapefile/WA_State_Boundary.shp", sep="")
+or_shapefile_address <- paste("Shapefiles/OR_Shapefile/Oregon.shp", sep="")
+id_shapefile_address <- paste("Shapefiles/Idaho_shapefile/Shape/GU_StateOrTerritory.shp", sep="")
+
+wa_shp = st_read(wa_shapefile_address)
+or_shp = st_read(or_shapefile_address)
+id_shp = st_read(id_shapefile_address)
+huc6_shp = st_read(huc6_shapefile_address)
+```
+
+
+## 1. PNW's elevation dataset (Figure 1)
+#-------------------------------------------------------------------------------
+## 			EXTRACTING ELEVATION DATASET FOR US PORTION OF PNW
+#-------------------------------------------------------------------------------	
+```{r Extracting Elevation Data }
+elev_inputfilename <- paste("PNW_Elevation.txt",sep="") 				
+elevation <- read_csv(file = elev_inputfilename,col_names = TRUE, show_col_types = FALSE)		
+
+HSS_inputfilename <- paste(input_dir, "GridWise_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_09_PNW_BothThreshold_NDJF.txt",sep="")					
+HSS_data <- read_csv(file = HSS_inputfilename, col_names = TRUE, show_col_types = FALSE)# Reading and only selecting particular columns to save memory 
+merged_data <- merge(HSS_data,elevation,by=c("Lat","Lon"))	
+
+elevation <- dplyr::select(merged_data,c("Lat","Lon","Elevation"))
+elev_outputfilename <- paste(output_dir,"PNW_Elevation_forUSportionOnly.txt",sep="") 
+write_csv(x = elevation, file = elev_outputfilename , append = FALSE, col_names = TRUE)
+rm(HSS_data,HSS_inputfilename,merged_data)
+```
+# Plot the elevation data (elev_outputfilename) in ArcMap
+
+## 2. PNW's Cropland Grids (Figure 1)
+#-------------------------------------------------------------------------------
+## 		PNW's CROPLAND - IRRIGATED & NON-IRRIGATED GRIDS
+#-------------------------------------------------------------------------------	
+```{r Cropland Grids}
+vegetation_file <- paste("PNW_crop_coverage_with_area_2024.txt",sep="")
+vegetation <- read_csv(file=vegetation_file,col_names = TRUE, show_col_types = FALSE)
+veg_irrg <- filter(vegetation,(Crop_Code >= 100 & Crop_Code <10000))
+veg_nonirrg <- filter(vegetation,(Crop_Code >= 10000))
+veg_irrg_outputfilename <- paste(output_dir,"PNW_Irrigated_Croplands.txt",sep="")
+veg_nonirrg_outputfilename <- paste(output_dir,"PNW_Non_Irrigated_Croplands.txt",sep="") 
+write_csv(x = veg_irrg, file = veg_irrg_outputfilename, append = FALSE, col_names = TRUE)
+write_csv(x = veg_nonirrg, file = veg_nonirrg_outputfilename, append = FALSE, col_names = TRUE)
+```
+# Plot the irrigated and non-irrigated croplands in ArcMap
+
+#-------------------------------------------------------------------------------
+## 		3. Forecast Skill in Fall Fertilization Application Decision (Figure 3)
+#-------------------------------------------------------------------------------	
+```{r Plotting HSS of Fall Fertilizer Application for NDJF season on HUC 06 level, echo=FALSE, warning = FALSE}
+for (init in c(11,10,9)){
+  HSS_inputfilename <- paste(input_dir, "HUC0",huc,"_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
+	if (file.exists(HSS_inputfilename) == FALSE){
+	  text0 <- paste("File Does not Exist !",HSS_inputfilename)
+		print(text0)
+	}else{
+		HSS_data <- read_csv(file = HSS_inputfilename,col_names = TRUE, show_col_types = FALSE)
+		HSS_data <- na.omit(HSS_data)
+		lookt <- c(0,0,0,0,0,-5,-4,-3,-2,-1,0,0)
+    init1 =  lookt[init]
+    HSS_data['Init'] <- factor(init1)						
+		if (exists('dfdata') != TRUE){
+			dfdata <- HSS_data
+			rm(HSS_data)
+		}else{
+			dfdata <- rbind(dfdata,HSS_data)
+			rm(HSS_data)
+		}
+		dfdata$Init <- factor(dfdata$Init, levels = c(0,-1,-2,-3))
+		dfdata <- dplyr::select(dfdata0,c("Init","Name","Below 33rd Percentile","Above 67th Percentile"))
+    colnames(dfdata) <- c("Init","Name","Forecast of Cold Winters","Forecast of Warm Winters")
+    dfdata_short <- dfdata %>% pivot_longer(!c("Name","Init"),names_to="Group",values_to ="Value")
+    ggfilename <- paste(output_dir,"HUC06_SpatialMaps_HSS_ENSMEAN_Fall_Fertilization_PNW_NDJF.jpeg",sep = "")  # output figure's name
+
+	  data_merged <- merge(huc6_shp,dfdata,by='Name')
+		  	
+	  #New color scheme.
+		plot1 <- ggplot() + geom_sf(data = data_merged, aes(fill = Value)) +
+		                  scale_fill_gradientn(colours=c("orangered4","brown4","chocolate","yellow","white","green","darkgreen","darkblue","darkviolet"),
+		                            n.breaks=10,limits = c(-100,100), name='Heidke Skill Score') +
+		      						facet_grid(Category~ Init,switch="y",labeller=label_wrap_gen(11))+ scale_x_continuous(breaks = seq(-125, -109, by = 3))+
+		                  scale_y_continuous(breaks = seq(40, 54, by = 2),position='left')+
+		      		  	    geom_sf(data = region_shp, mapping = aes(fill = OBJECTID), color = alpha("black",0.5),size = 0.5, fill = NA) +
+		      				   	ylab("Seasons") + theme_bw() + 
+		                  theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=11,face="bold"),
+		                        axis.text.x=element_text(angle=90,size=11,face="bold"),axis.title.x = element_blank(), axis.title.y =element_blank(),
+		                        panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.title = element_text(angle =0,size=11,face='bold'),
+		                        legend.text = element_text(size=13),legend.position="bottom",legend.title.align = 0.5,
+		                        strip.text = element_text(size=13,face="bold"))+
+		                  guides(reverse = TRUE,fill =guide_colourbar(barwidth =35, barheight =1,title.position = "bottom"))+
+		        jpeg(filename=ggfilename, bg="white", width=7000, height=3500, pointsize=15, res=600, quality=100)
+		
+		plot(plot1)
+		dev.off()
+		rm(dfdata,data_merged)
+	}
+}  
+```
+
+
+#-------------------------------------------------------------------------------
+## 		3. Forecast Skill in Fall Fertilization Application Decision (Figure 3)
+#-------------------------------------------------------------------------------	
+```{r Plotting HSS of Fall Fertilizer Application for NDJF season on HUC 06 level, echo=FALSE, warning = FALSE}
+for (init in c(11,10,9)){
+  HSS_inputfilename <- paste(input_dir, "HUC0",huc,"_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
+	if (file.exists(HSS_inputfilename) == FALSE){
+	  text0 <- paste("File Does not Exist !",HSS_inputfilename)
+		print(text0)
+	}else{
+		HSS_data <- read_csv(file = HSS_inputfilename,col_names = TRUE, show_col_types = FALSE)
+		HSS_data <- na.omit(HSS_data)
+		lookt <- c(0,0,0,0,0,-5,-4,-3,-2,-1,0,0)
+    init1 =  lookt[init]
+    HSS_data['Init'] <- factor(init1)						
+		if (exists('dfdata') != TRUE){
+			dfdata <- HSS_data
+			rm(HSS_data)
+		}else{
+			dfdata <- rbind(dfdata,HSS_data)
+			rm(HSS_data)
+		}
+		dfdata$Init <- factor(dfdata$Init, levels = c(0,-1,-2,-3))
+		dfdata <- dplyr::select(dfdata0,c("Init","Name","Below 33rd Percentile","Above 67th Percentile"))
+    colnames(dfdata) <- c("Init","Name","Forecast of Cold Winters","Forecast of Warm Winters")
+    dfdata_short <- dfdata %>% pivot_longer(!c("Name","Init"),names_to="Group",values_to ="Value")
+    ggfilename <- paste(output_dir,"HUC06_SpatialMaps_HSS_ENSMEAN_Fall_Fertilization_PNW_NDJF.jpeg",sep = "")  # output figure's name
+
+	  data_merged <- merge(huc6_shp,dfdata,by='Name')
+		  	
+	  #New color scheme.
+		plot1 <- ggplot() + geom_sf(data = data_merged, aes(fill = Value)) +
+		                  scale_fill_gradientn(colours=c("orangered4","brown4","chocolate","yellow","white","green","darkgreen","darkblue","darkviolet"),
+		                            n.breaks=10,limits = c(-100,100), name='Heidke Skill Score') +
+		      						facet_grid(Category~ Init,switch="y",labeller=label_wrap_gen(11))+ scale_x_continuous(breaks = seq(-125, -109, by = 3))+
+		                  scale_y_continuous(breaks = seq(40, 54, by = 2),position='left')+
+		      		  	    geom_sf(data = region_shp, mapping = aes(fill = OBJECTID), color = alpha("black",0.5),size = 0.5, fill = NA) +
+		      				   	ylab("Seasons") + theme_bw() + 
+		                  theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=11,face="bold"),
+		                        axis.text.x=element_text(angle=90,size=11,face="bold"),axis.title.x = element_blank(), axis.title.y =element_blank(),
+		                        panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.title = element_text(angle =0,size=11,face='bold'),
+		                        legend.text = element_text(size=13),legend.position="bottom",legend.title.align = 0.5,
+		                        strip.text = element_text(size=13,face="bold"))+
+		                  guides(reverse = TRUE,fill =guide_colourbar(barwidth =35, barheight =1,title.position = "bottom"))+
+		        jpeg(filename=ggfilename, bg="white", width=7000, height=3500, pointsize=15, res=600, quality=100)
+		
+		plot(plot1)
+		dev.off()
+		rm(dfdata,data_merged)
+	}
+}  
+```
+
+#-------------------------------------------------------------------------------
+## 	BAR PLOT - HSS FALL FERTILIZATION  (Figure 4)
+#-------------------------------------------------------------------------------	
+
+```{r HSS Vegetation}
+vegetation_file <- paste(input_dir,"PNW_crop_coverage_with_area_2024.txt",sep="")
+vegetation <- read_csv(file=vegetation_file,col_names = TRUE, show_col_types = FALSE,col_select = c("Cell_id","Crop_Code","Crop_Frac","Grid_area_km2","Crop_area_km2"))
+colnames(vegetation) <- c("cell_id","Crop_Code","Crop_Frac","Grid_area_km2","Crop_area_km2")
+veg_irrg <- filter(vegetation,(Crop_Code >= 100 & Crop_Code <10000))
+veg_nonirrg <- filter(vegetation,(Crop_Code >= 10000))
+rm(dfdata_bin)
+for (init in c(11,10,9)){
+  HSS_inputfilename <- paste(input_dir, "GridWise_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")					
+  if (file.exists(HSS_inputfilename) == FALSE){
+    text0 <- paste("File Does not Exist !",HSS_inputfilename)
+  	print(text0)
+  }else{
+    HSS_data0 <- read_csv(file = HSS_inputfilename, col_names = TRUE, show_col_types = FALSE)							# Reading and only selecting particular columns to save memory and faster computations.
+    colnames(HSS_data0) <- c("Lat","Lon","Below_33rd_Percentile","Between","Above_67th_Percentile")
+		HSS_data0 <- na.omit(HSS_data0)
+		# Merge Elevation data to attach "cell_id" to HSS data based on "Lat" and "Lon"
+		HSS_data1 <- merge(HSS_data0,elevation,by=c("Lat","Lon"))			          	# Merging HSS and Elevation data together
+		# Extract Only Irrigated Grid Cells and generate weighted mean HSS (multiply irrigated crop_area of individual grids to HSS and then divide it with total area of irrigated grids)
+		# Make a column named "Category"  --> as.factor(Irrigated)
+		HSS_data2 <- merge(HSS_data1,veg_irrg,by="cell_id",all.x=TRUE)
+    HSS_data2 <- na.omit(HSS_data2)	
+		HSS_data2['Category'] <- as.factor("Irrigated")
+		HSS_data2['B33'] <- HSS_data2$Below_33rd_Percentile * HSS_data2$Crop_area_km2
+		HSS_data2['A67'] <- HSS_data2$Above_67th_Percentile * HSS_data2$Crop_area_km2
+		HSS_data3 <- HSS_data2 %>% group_by(Category) %>% 
+		  summarize("Forecast of Cold Winters" = sum(B33)/sum(Crop_area_km2),"Forecast of Warm Winters" = sum(A67)/sum(Crop_area_km2))
+		# Extract Only Non-Irrigated Grid Cells and generate weighted HSS (multiply non-irrigated crop_area of individual grids to HSS and then divide it with total area of Non-irrigated grids)
+		# Make a column named "Category"  --> as.factor(Non-Irrigated)
+	  HSS_data4 <- merge(HSS_data1,veg_nonirrg,by="cell_id",all.x=TRUE)
+    HSS_data4 <- na.omit(HSS_data4)	
+		HSS_data4['Category'] <- as.factor("Non Irrigated")
+		HSS_data4['B33'] <- HSS_data4$Below_33rd_Percentile * HSS_data4$Crop_area_km2
+		HSS_data4['A67'] <- HSS_data4$Above_67th_Percentile * HSS_data4$Crop_area_km2
+		HSS_data5 <- HSS_data4 %>% group_by(Category) %>%
+		  summarize("Forecast of Cold Winters" = sum(B33)/sum(Crop_area_km2),  "Forecast of Warm Winters" = sum(A67)/sum(Crop_area_km2))
+		# Join above data frames (Irrigated and Non-irrigated) row-wise i.e. use "rbind"
+		rm(HSS_data2,HSS_data4)
+    bin_data <- rbind(HSS_data3,HSS_data5)
+    # Make Column Named "Init" to save "initialization month"
+		lookt <- c(0,0,0,0,0,-5,-4,-3,-2,-1,0,0)
+    init1 =  lookt[init]
+    bin_data['Init'] <- factor(init1)		
+  	if (exists('dfdata_bin') != TRUE){
+  	  dfdata_bin <- bin_data
+  		rm(bin_data)
+  	}else{
+  		dfdata_bin <- rbind(dfdata_bin,bin_data)
+  		rm(bin_data)
+  	}
+  }
+}  
+
+dfdata_bin <- na.omit(dfdata_bin)
+dfdata_bin$Init <- factor(dfdata_bin$Init, levels = c(0,-1,-2,-3))
+dfdata_bin$Category <- factor(dfdata_bin$Category,levels=c("Irrigated","Non Irrigated"))
+dfdata_short <- dfdata_bin %>% pivot_longer(!c("Category","Init"),names_to="Threshold",values_to ="HSS")
+
+ggfilename <- paste(output_dir,"Fall_Fertilization_HSS_VEGETATION_Correlation_BINNED_Bargraph_NDJF.jpeg",sep = "")  # output figure's name
+
+plot1 <- ggplot(data = dfdata_short, aes(x= str_wrap(Category,width=9), y= HSS,fill = Category))+
+              geom_bar(stat="identity",width=0.5,color=c("darkblue"))+scale_fill_manual(values=c("blue","darkgreen"))+
+              facet_grid(Threshold ~ Init,switch="y",labeller=label_wrap_gen(11))+
+  		      	xlab("Category") +	ylab("Initializaiton") + theme_bw() + 
+              theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=11,face="bold"),
+                    axis.text.x=element_text(angle=0,size=8,face="bold"), axis.title.x = element_blank(), axis.title.y =element_blank(),
+                    panel.grid.major = element_blank(),panel.grid.minor = element_blank(),
+                    legend.title = element_text(angle =270,size=18,face='bold'),
+                    legend.text = element_text(size=18),legend.title.align = 0.5,strip.text = element_text(size=18,face="bold"))+
+              guides(reverse = TRUE,fill =guide_colourbar(barwidth = 1, barheight = 20,title.position = "right"))+
+  		        jpeg(filename=ggfilename, bg="white", width=2500, height=1500, pointsize=13, res=300, quality=100)
+  		
+plot(plot1)
+dev.off()
+```
+
+#-------------------------------------------------------------------------------
+## 	Forecast Skill in Predicting Drought Based on the Regional Water Supply  (Figure 5)
+#-------------------------------------------------------------------------------	
+```{r Drought Response, echo=FALSE, warning = FALSE}
+ggfilename <- paste(output_dir,"HUC06_SpatialMaps_HSS_DroughtResponse_AMJJAS.jpeg",sep = "")  # output figure's name
+for (init in c(4,3,2)){
+  HSS_inputfilename <- paste(input_dir,"HUC06_HeidkeSkillScore_Accumulated_Baseflow_Runoff_InitMonth_0",
+                               init,"_PNW_AMJJAS_75percentMedian_BothThreshold.txt",sep="")
+	HSS_data <- read_csv(file = HSS_inputfilename,col_names = TRUE, show_col_types = FALSE)
+	HSS_data <- na.omit(HSS_data)
+	lookt <- c(-3,-2,-1,0,0,0,0,0,0,-6,-5,-4)
+	init1 =  lookt[init]
+  HSS_data['Init'] <- factor(init1)						
+	if (exists('dfdata') != TRUE){
+	  dfdata <- HSS_data
+		rm(HSS_data,HSS_data1)
+	}else{
+	  dfdata <- rbind(dfdata,HSS_data)
+		rm(HSS_data,HSS_data1)
+	}
+}
+dfdata$Init <- factor(dfdata$Init, levels = c(0,-1,-2))
+data_merged <- merge(huc6_shp,dfdata,by='Name')
+
+plot1 <- ggplot() + geom_sf(data = data_merged, aes(fill = Value)) +
+                  scale_fill_gradientn(colours=c("orangered4","brown4","chocolate","yellow","white","green","darkgreen","darkblue","darkviolet"),
+                            n.breaks=10,limits = c(-100,100), name='Heidke Skill Score') +
+      						facet_grid(Category~ Init,switch="y",labeller=label_wrap_gen(11))+ scale_x_continuous(breaks = seq(-125, -109, by = 3))+
+                  scale_y_continuous(breaks = seq(40, 54, by = 2),position='left')+
+      		  	    geom_sf(data = region_shp, mapping = aes(fill = OBJECTID), color = alpha("black",0.5),size = 0.5, fill = NA) +
+      				   	ylab("Seasons") + theme_bw() + 
+                  theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=11,face="bold"),
+                        axis.text.x=element_text(angle=90,size=11,face="bold"),axis.title.x = element_blank(), axis.title.y =element_blank(),
+                        panel.grid.major = element_blank(),panel.grid.minor = element_blank(), legend.title = element_text(angle =0,size=11,face='bold'),
+                        legend.text = element_text(size=13),legend.position="bottom",legend.title.align = 0.5,
+                        strip.text = element_text(size=13,face="bold"))+
+                  guides(reverse = TRUE,fill =guide_colourbar(barwidth =35, barheight =1,title.position = "bottom"))+
+        jpeg(filename=ggfilename, bg="white", width=7000, height=3500, pointsize=15, res=600, quality=100)
+
+plot(plot1)
+dev.off()
+rm(dfdata,data_merged,plot1)
+``` 
+
+#-------------------------------------------------------------------------------
+## 	Forecast Skill in Drought Response - Yakima Basin  (Figure 6)
+#-------------------------------------------------------------------------------
+
+
+## Spatial Maps of Drought Response of Others Basins - Lead 0 - HSS, Elevation, Actual runoff+baseflow
+```{r Gridwise Binary Drought Response Spatial Maps - Others, echo=FALSE, warning = FALSE}
+
+#-------------------------------------------------------------------------------
+## 			FUNCTION FOR SPATIAL OPERATIONS
+#-------------------------------------------------------------------------------
+
+perform_spatial_operations <- function(current_huc_name, full_huc_shapefile, data_transformed_as_sf) {
+	nam1 <- subset(full_huc_shapefile, Name == current_huc_name)																			# Subset the HUC06 file to extract current sub-basin's shapefile.
+	shp1 = st_transform(structure(nam1, proj4string = "+init=epsg:3857"), "+init=epsg:4326")								# Transform the projection of subsetted sub-basin's shapefile
+	intersect_ind =st_intersects(data_transformed_as_sf, shp1, sparse=FALSE)																# Finding row index of coordinates in sf_data (i.e. merged_data) which falls within sub-basin. 
+	data_hucc = data_transformed_as_sf[intersect_ind,]																						# Extracting data from sf_data based on "intersect_ind".
+	df_data_huc <- st_drop_geometry(data_hucc)
+   	df_data_huc <- na.omit(df_data_huc)																						# Removing unintentionally introduced NA's in the data
+	return(df_data_huc)
+}
+
+region_shp <- huc6_shp
+ggfilename <- paste(output_dir,"YK_SpatialMaps_DroughtResponse_GridWiseHSS_Elevation_ActualRunoffBaseflow_AMJJAS.jpeg",sep = "")  # output figure's name
+HSS_inputfilename <- paste(input_dir, "GridWise_BinaryThreshold_HeidkeSkillScore_Drought_Response_InitMonth_04_PNW_75percentMedian_BothThreshold.txt",sep="")
+elevation_inputfilename <- paste(input_dir,"PNW_Elevation.txt",sep="") 				
+elevation <- read_csv(file = elevation_inputfilename,col_names = TRUE, show_col_types = FALSE, col_select = c("Lat","Lon","Elevation"))			
+elevation <- na.omit(elevation)
+HSS_data <- read_csv(file = HSS_inputfilename,col_names = TRUE, show_col_types = FALSE)
+HSS_data <- na.omit(HSS_data)
+elevation1 <- merge(HSS_data,elevation, by=c("Lat","Lon"))
+elevation1$Lat1 <- elevation1$Lat
+elevation1$Lon1 <- elevation1$Lon
+sf_data = st_as_sf(elevation1, coords = c("Lon", "Lat"),crs=4326)		# Transforming merged data into shapefile for subsequent processing
+gg =11 # middle snake powder
+name_huc <- huc6_shp$Name	
+current_huc <- name_huc[gg]																							# Current Sub-basin
+df_data_huc <- perform_spatial_operations(current_huc, huc6_shp, sf_data)												# Perform spatial operation on current sub-basin
+Lat_min <- round(min(df_data_huc$Lat1))
+Lat_max <- round(max(df_data_huc$Lat1))
+Lon_min <- round(min(df_data_huc$Lon1))
+Lon_max <- round(max(df_data_huc$Lon1))
+polygon_to_plot <- region_shp[region_shp$Name == current_huc, ]
+polygon_to_plot <- st_transform(polygon_to_plot,crs=4326)
+mapRange1 <- st_bbox(polygon_to_plot)
+plot1 <- ggplot()+ geom_tile(data = df_data_huc, aes(x = Lon1, y = Lat1, fill = HeidkeSkillScore_DroughtVsNonDrought)) +
+               scale_fill_gradientn(colours=c("orangered4","brown4","chocolate","darkorange","grey50","darkgreen","cyan","darkblue","darkviolet"),
+                                              n.breaks=10,limits = c(-100,100), name='Heidke Skill Score')+
+					    scale_x_continuous(breaks = seq(Lon_min,Lon_max, by = 1))+ scale_y_continuous(breaks = seq(Lat_min,Lat_max, by = 0.5),position='left')+
+              geom_sf(data = polygon_to_plot, mapping = aes(fill = OBJECTID), color = alpha("black",0.5),size = 0.5, fill = NA) +
+              coord_sf(xlim = mapRange1[c(1,3)], ylim = mapRange1[c(2,4)])+ 
+              theme_bw() + theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=13,face="bold"),
+					                       axis.text.x=element_text(angle=0,size=13,face="bold"),axis.title.x = element_blank(), axis.title.y =element_blank(),
+					                       panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position="bottom",
+					                       legend.title = element_text(angle =0,size=13,face='bold'), legend.text = element_text(size=13),
+					                       legend.title.align = 0.5,strip.text = element_text(size=13,face="bold"))+
+              guides(reverse = TRUE,fill =guide_colourbar(barwidth = 18, barheight = 1,title.position = "bottom")) 
+plot2 <- ggplot()+geom_tile(data = df_data_huc, aes(x = Lon1, y = Lat1, fill = Elevation)) +
+               scale_fill_gradientn(colours=c("lightskyblue","slategray3","lemonchiffon","salmon1","tomato1","tomato4"),
+                                              n.breaks=6,breaks = c(1,500,1000,1500,2000,2500,3300),name='Elevation')+ 
+              scale_x_continuous(breaks = seq(Lon_min,Lon_max, by = 1))+ scale_y_continuous(breaks = seq(Lat_min,Lat_max, by = 0.5),position='left')+
+              geom_sf(data = polygon_to_plot, mapping = aes(fill = OBJECTID), color = alpha("black",0.5),size = 0.5, fill = NA) +
+              coord_sf(xlim = mapRange1[c(1,3)], ylim = mapRange1[c(2,4)])+ 
+					    theme_bw() + theme(strip.placement = 'outside',panel.spacing.x = unit(0.2,"cm"), axis.text=element_text(size=13,face="bold"),
+					                       axis.text.x=element_text(angle=0,size=13,face="bold"),axis.title.x = element_blank(), axis.title.y =element_blank(),
+					                       panel.grid.major = element_blank(), panel.grid.minor = element_blank(), legend.position="bottom",
+					                       legend.title = element_text(angle =0,size=13,face='bold'), legend.text = element_text(size=13),
+					                       legend.title.align = 0.5,strip.text = element_text(size=13,face="bold"))+
+              guides(reverse = TRUE,fill =guide_colourbar(barwidth = 18, barheight = 1,title.position = "bottom")) 
+plot4 <- egg::ggarrange(plot1,plot2, nrow=1)
+ggsave(filename = ggfilename,plot=plot4,height=5,width=12,units="in",dpi=1200)
+rm(plot4,plot1,plot2,df_data_huc)
+``` 
