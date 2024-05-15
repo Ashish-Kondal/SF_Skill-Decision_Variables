@@ -1,0 +1,23 @@
+Initialization,Name,BinaryForecast_75percentMedian
+3,Spokane,68.8524590163934
+3,Snake Headwaters,65.1376146788991
+3,Clearwater,65.2014652014652
+3,Middle Snake-Powder,29.9539170506912
+3,Deschutes,27.2030651340996
+3,Lower Snake,36.6666666666667
+3,Middle Snake-Boise,19.7183098591549
+3,Kootenai,45.7142857142857
+3,Pend Oreille,53.6585365853659
+3,Upper Columbia,49.5575221238938
+3,Yakima,47.5138121546961
+3,Upper Snake,47.4654377880184
+3,John Day,23.4432234432234
+3,Northern Oregon Coastal,-26.6666666666667
+3,Washington Coastal,25.3275109170306
+3,Oregon Closed Basins,36.8770764119601
+3,Middle Columbia,28.3018867924528
+3,Puget Sound,41.8367346938776
+3,Lower Columbia,-1.95121951219512
+3,Willamette,-1.95121951219512
+3,Southern Oregon Coastal,-5.06912442396313
+3,Salmon,48.993288590604
