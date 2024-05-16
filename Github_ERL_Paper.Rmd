@@ -51,17 +51,19 @@ library(stringr)
 #-------------------------------------------------------------------------------
 
 ```{r Input setup, echo=FALSE}
-input_dir <- paste("sample_data/", sep="")  		 # Setting working directory and suffix as file address
+input_dir <- paste("sample_data/", sep="")  			 # Setting input directory 
 output_dir <- paste("sample_data/output/", sep="") 		 # Setting output directory to store files and final images
 
 if (!dir.exists(paste(output_dir, sep=""))){			# check if output directory already exists or not.
 	dir.create(paste(output_dir, sep="")) }  			# Create output directory if not already exists
 
-huc6_shapefile_address <- paste("Shapefiles/PNW_Shapefile_USonly/pnw_shapefile_USonly.shp", sep="")
-wa_shapefile_address <- paste("Shapefiles/WA_Shapefile/WA_State_Boundary.shp", sep="")
-or_shapefile_address <- paste("Shapefiles/OR_Shapefile/Oregon.shp", sep="")
-id_shapefile_address <- paste("Shapefiles/Idaho_shapefile/Shape/GU_StateOrTerritory.shp", sep="")
+# Provide file path to the shapefiles
+huc6_shapefile_address <- paste("Shapefiles/PNW_Shapefile_USonly/pnw_shapefile_USonly.shp", sep="")		# PNW's shapefile at HUC06 Level
+wa_shapefile_address <- paste("Shapefiles/WA_Shapefile/WA_State_Boundary.shp", sep="")				# Shapefile of Washington state
+or_shapefile_address <- paste("Shapefiles/OR_Shapefile/Oregon.shp", sep="")					# Shapefile of Oregon state
+id_shapefile_address <- paste("Shapefiles/Idaho_shapefile/Shape/GU_StateOrTerritory.shp", sep="")		# Shapefile of Idaho state
 
+# Reading shapefiles 
 wa_shp = st_read(wa_shapefile_address)
 or_shp = st_read(or_shapefile_address)
 id_shp = st_read(id_shapefile_address)
@@ -71,32 +73,40 @@ huc6_shp = st_read(huc6_shapefile_address)
 
 ## 1. PNW's elevation dataset (Figure 1)
 #-------------------------------------------------------------------------------
-## 			EXTRACTING ELEVATION DATASET FOR US PORTION OF PNW
+## 			EXTRACTING ELEVATION DATASET FOR US PORTION OF PNW (Figure 1)
 #-------------------------------------------------------------------------------	
 ```{r Extracting Elevation Data }
-elev_inputfilename <- paste("PNW_Elevation.txt",sep="") 				
-elevation <- read_csv(file = elev_inputfilename,col_names = TRUE, show_col_types = FALSE)		
+# Reading elevation dataset 
+elev_inputfilename <- paste("PNW_Elevation.txt",sep="") 						# path to elevation file	
+elevation <- read_csv(file = elev_inputfilename,col_names = TRUE, show_col_types = FALSE)		# Reading elevation file
 
-HSS_inputfilename <- paste(input_dir, "GridWise_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_09_PNW_BothThreshold_NDJF.txt",sep="")					
-HSS_data <- read_csv(file = HSS_inputfilename, col_names = TRUE, show_col_types = FALSE)# Reading and only selecting particular columns to save memory 
-merged_data <- merge(HSS_data,elevation,by=c("Lat","Lon"))	
+# Extracting elevation data for the US portion of the PNW region
+HSS_inputfilename <- paste(input_dir, "GridWise_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_09_PNW_BothThreshold_NDJF.txt",sep="")  # Reading one of the skill metric files to get the spatial extent of PNW.	
+HSS_data <- read_csv(file = HSS_inputfilename, col_names = TRUE, show_col_types = FALSE)						      # Reading above file
+merged_data <- merge(HSS_data,elevation,by=c("Lat","Lon"))						# Merging elevation and skill metric data to remove all the grids that are not present in the skill metric file
 
-elevation <- dplyr::select(merged_data,c("Lat","Lon","Elevation"))
-elev_outputfilename <- paste(output_dir,"PNW_Elevation_forUSportionOnly.txt",sep="") 
-write_csv(x = elevation, file = elev_outputfilename , append = FALSE, col_names = TRUE)
+# Saving the extracted elevation data in a text file for plotting in arcmap
+elevation <- dplyr::select(merged_data,c("Lat","Lon","Elevation"))					# select columns to save memory
+elev_outputfilename <- paste(output_dir,"PNW_Elevation_forUSportionOnly.txt",sep="") 			# Output elevation file name
+write_csv(x = elevation, file = elev_outputfilename , append = FALSE, col_names = TRUE)			# Saving the elevation data for plotting later in arcmap.
 rm(HSS_data,HSS_inputfilename,merged_data)
 ```
 # Plot the elevation data (elev_outputfilename) in ArcMap
 
 ## 2. PNW's Cropland Grids (Figure 1)
 #-------------------------------------------------------------------------------
-## 		PNW's CROPLAND - IRRIGATED & NON-IRRIGATED GRIDS
+## 		PNW's CROPLAND - IRRIGATED & NON-IRRIGATED GRIDS (Figure 1)
 #-------------------------------------------------------------------------------	
 ```{r Cropland Grids}
+# Reading the vegetation file
 vegetation_file <- paste("PNW_crop_coverage_with_area_2024.txt",sep="")
 vegetation <- read_csv(file=vegetation_file,col_names = TRUE, show_col_types = FALSE)
+
+# Filter the irrigated and non-irrigated crop grids separately
 veg_irrg <- filter(vegetation,(Crop_Code >= 100 & Crop_Code <10000))
 veg_nonirrg <- filter(vegetation,(Crop_Code >= 10000))
+
+# Saving the above data in separate text files - Plot in Arcmap 
 veg_irrg_outputfilename <- paste(output_dir,"PNW_Irrigated_Croplands.txt",sep="")
 veg_nonirrg_outputfilename <- paste(output_dir,"PNW_Non_Irrigated_Croplands.txt",sep="") 
 write_csv(x = veg_irrg, file = veg_irrg_outputfilename, append = FALSE, col_names = TRUE)
@@ -105,7 +115,7 @@ write_csv(x = veg_nonirrg, file = veg_nonirrg_outputfilename, append = FALSE, co
 # Plot the irrigated and non-irrigated croplands in ArcMap
 
 #-------------------------------------------------------------------------------
-## 		3. Forecast Skill in Fall Fertilization Application Decision (Figure 3)
+## 	 Forecast Skill in Fall Fertilization Application Decision (Figure 3)
 #-------------------------------------------------------------------------------	
 ```{r Plotting HSS of Fall Fertilizer Application for NDJF season on HUC 06 level, echo=FALSE, warning = FALSE}
 for (init in c(11,10,9)){
