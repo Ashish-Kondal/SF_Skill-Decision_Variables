@@ -27,7 +27,7 @@ rm(list = ls()) 				# Clearing the Environment and saved variable
 #install.packages("Metrics")
 #install.packages("ggpubr")
 #install.packages("swfscMisc")
-#install.packages("here")
+#install.packages("sf")
 
 
 
@@ -41,7 +41,6 @@ library(dplyr)
 library(tidyverse)
 library(ggplot2)
 library(sf)
-library(here)
 library(stringr)
 ```
 
@@ -51,17 +50,20 @@ library(stringr)
 #-------------------------------------------------------------------------------
 
 ```{r Input setup, echo=FALSE}
-input_dir <- paste("sample_data/", sep="")  			 # Setting input directory 
-output_dir <- paste("sample_data/output/", sep="") 		 # Setting output directory to store files and final images
+# Setting the working directory
+wd <- setwd("YOUR PATH")
+
+input_dir <- paste(wd,"sample_data/", sep="")  			 # Setting input directory 
+output_dir <- paste(wd,"sample_data/output/", sep="") 		 # Setting output directory to store files and final images
 
 if (!dir.exists(paste(output_dir, sep=""))){			# check if output directory already exists or not.
 	dir.create(paste(output_dir, sep="")) }  			# Create output directory if not already exists
 
 # Provide file path to the shapefiles
-huc6_shapefile_address <- paste("Shapefiles/PNW_Shapefile_USonly/pnw_shapefile_USonly.shp", sep="")		# PNW's shapefile at HUC06 Level
-wa_shapefile_address <- paste("Shapefiles/WA_Shapefile/WA_State_Boundary.shp", sep="")				# Shapefile of Washington state
-or_shapefile_address <- paste("Shapefiles/OR_Shapefile/Oregon.shp", sep="")					# Shapefile of Oregon state
-id_shapefile_address <- paste("Shapefiles/Idaho_shapefile/Shape/GU_StateOrTerritory.shp", sep="")		# Shapefile of Idaho state
+huc6_shapefile_address <- paste(wd,"Shapefiles/PNW_Shapefile_USonly/pnw_shapefile_USonly.shp", sep="")		# PNW's shapefile at HUC06 Level
+wa_shapefile_address <- paste(wd,"Shapefiles/WA_Shapefile/WA_State_Boundary.shp", sep="")			# Shapefile of Washington state
+or_shapefile_address <- paste(wd,"Shapefiles/OR_Shapefile/Oregon.shp", sep="")					# Shapefile of Oregon state
+id_shapefile_address <- paste(wd,"Shapefiles/Idaho_shapefile/GU_StateOrTerritory.shp", sep="")			# Shapefile of Idaho state
 
 # Reading shapefiles 
 wa_shp = st_read(wa_shapefile_address)
@@ -77,7 +79,7 @@ huc6_shp = st_read(huc6_shapefile_address)
 #-------------------------------------------------------------------------------	
 ```{r Extracting Elevation Data }
 # Reading elevation dataset 
-elev_inputfilename <- paste("PNW_Elevation.txt",sep="") 						# path to elevation file	
+elev_inputfilename <- paste(wd,"sample_data/PNW_Elevation.txt",sep="") 						# path to elevation file	
 elevation <- read_csv(file = elev_inputfilename,col_names = TRUE, show_col_types = FALSE)		# Reading elevation file
 
 # Extracting elevation data for the US portion of the PNW region
@@ -99,7 +101,7 @@ rm(HSS_data,HSS_inputfilename,merged_data)
 #-------------------------------------------------------------------------------	
 ```{r Cropland Grids}
 # Reading the vegetation file
-vegetation_file <- paste("PNW_crop_coverage_with_area_2024.txt",sep="")
+vegetation_file <- paste("sample_data/PNW_crop_coverage_with_area_2024.txt",sep="")
 vegetation <- read_csv(file=vegetation_file,col_names = TRUE, show_col_types = FALSE)
 
 # Filter the irrigated and non-irrigated crop grids separately
@@ -119,7 +121,10 @@ write_csv(x = veg_nonirrg, file = veg_nonirrg_outputfilename, append = FALSE, co
 #-------------------------------------------------------------------------------	
 ```{r Plotting HSS of Fall Fertilizer Application for NDJF season on HUC 06 level, echo=FALSE, warning = FALSE}
 for (init in c(11,10,9)){
-  HSS_inputfilename <- paste(input_dir, "HUC0",huc,"_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
+  if (exists('dfdata') == TRUE){
+			rm(dfdata)
+		}
+  HSS_inputfilename <- paste(input_dir, "HUC06_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
 	if (file.exists(HSS_inputfilename) == FALSE){
 	  text0 <- paste("File Does not Exist !",HSS_inputfilename)
 		print(text0)
@@ -137,7 +142,7 @@ for (init in c(11,10,9)){
 			rm(HSS_data)
 		}
 		dfdata$Init <- factor(dfdata$Init, levels = c(0,-1,-2,-3))
-		dfdata <- dplyr::select(dfdata0,c("Init","Name","Below 33rd Percentile","Above 67th Percentile"))
+		dfdata <- dplyr::select(dfdata,c("Init","Name","Below 33rd Percentile","Above 67th Percentile"))
     colnames(dfdata) <- c("Init","Name","Forecast of Cold Winters","Forecast of Warm Winters")
     dfdata_short <- dfdata %>% pivot_longer(!c("Name","Init"),names_to="Group",values_to ="Value")
     ggfilename <- paste(output_dir,"HUC06_SpatialMaps_HSS_ENSMEAN_Fall_Fertilization_PNW_NDJF.jpeg",sep = "")  # output figure's name
@@ -173,7 +178,7 @@ for (init in c(11,10,9)){
 #-------------------------------------------------------------------------------	
 ```{r Plotting HSS of Fall Fertilizer Application for NDJF season on HUC 06 level, echo=FALSE, warning = FALSE}
 for (init in c(11,10,9)){
-  HSS_inputfilename <- paste(input_dir, "HUC0",huc,"_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
+  HSS_inputfilename <- paste(input_dir, "HUC06_Tercile_HeidkeSkillScore_Fall_Fertilization_InitMonth_0",init,"_PNW_BothThreshold_NDJF.txt",sep="")
 	if (file.exists(HSS_inputfilename) == FALSE){
 	  text0 <- paste("File Does not Exist !",HSS_inputfilename)
 		print(text0)
