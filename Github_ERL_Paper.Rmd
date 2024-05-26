@@ -53,8 +53,7 @@ library(stringr)
 
 ```{r Input setup, echo=FALSE}
 # Setting the working directory
-#wd <- setwd("YOUR INPUT PATH")
-wd <- setwd("C:/Users/Ashish/Downloads/SF_Skill-Decision_Variables-main/SF_Skill-Decision_Variables-main/")
+wd <- setwd("YOUR INPUT PATH")
 
 input_dir <- paste(wd,"/sample_data/", sep="")  			 # Setting input directory 
 output_dir <- paste(wd,"/sample_data/output/", sep="") 		 # Setting output directory to store files and final images
