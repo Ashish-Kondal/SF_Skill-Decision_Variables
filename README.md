@@ -1,1 +1,1 @@
-# SF_Skill-Decision_Variables
+# Seasonal forecast skill in agricultural decision variables.
